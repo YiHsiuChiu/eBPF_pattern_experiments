@@ -1,0 +1,16 @@
+sudo bpftool prog load xdp_dns_limiter.bpf.o /sys/fs/bpf/xdp
+
+sudo bpftool prog list
+
+sudo bpftool net attach xdp name xdp_dns_limit dev lo
+
+sudo bpftool net list
+
+
+
+sudo bpftool net detach xdp dev lo
+
+sudo rm /sys/fs/bpf/xdp
+
+
+sudo cat /sys/kernel/tracing/trace_pipe

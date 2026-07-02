@@ -1,0 +1,9 @@
+{
+  "name": "ebpf-dns-limiter-test",
+  "version": "1.0.0",
+  "description": "Test client for XDP DNS rate limiter",
+  "main": "dns_test_client.js",
+  "dependencies": {
+    "dns2": "^2.1.0"
+  }
+}

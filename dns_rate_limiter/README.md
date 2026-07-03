@@ -65,16 +65,18 @@ sudo ./update_boot_time
 
 ## 4. 測試速率限制
 
-### 步驟 1：啟動測試 DNS 伺服器
-在獨立的終端機視窗中啟動監聽在 Port `5333` 的測試 DNS 伺服器：
+### 方案一：使用 eBPF/XDP 核心限速
+
+#### 步驟 1：啟動原始測試 DNS 伺服器
+在獨立的終端機視窗中啟動監聽在 Port `5333` 的測試 DNS 伺服器（此時不包含限速邏輯，限速由已部署的 XDP 程式在核心中執行）：
 ```bash
-node dns_server.js
+node orig_dns_server.js
 ```
 
-### 步驟 2：執行測試
+#### 步驟 2：執行測試
 您可以選擇使用 Node.js 測試用戶端或傳統的 `dig` 指令進行測試。
 
-#### 方法 A：使用 Node.js 測試用戶端
+##### 使用 Node.js 測試用戶端
 專案中提供了 `dns_test_client.js`，它會自動發送查詢並驗證速率限制：
 ```bash
 # 執行測試 (預設會向 127.0.0.1 查詢 www.google.com)
@@ -88,7 +90,7 @@ node dns_test_client.js 127.0.0.1 www.google.com
 2. **Query #2**：間隔 100 毫秒後發送相同的查詢（若在限制時間內，預期被 XDP **丟棄**並超時）。
 3. **Query #3**：間隔 1.5 秒後再次發送（預期**成功**收到回應）。
 
-#### 方法 B：使用 `dig` 指令手動測試
+##### 使用 `dig` 指令手動測試
 請注意，必須指定埠口 `-p 5333`：
 ```bash
 # 第一次查詢：預期成功返回
@@ -102,9 +104,30 @@ sleep 1.5
 dig @127.0.0.1 -p 5333 www.google.com
 ```
 
+---
+
+### 方案二：使用 Node.js 模擬限速 DNS 伺服器 (免裝/免載入 eBPF/XDP)
+
+如果您不想部署 eBPF/XDP 核心程式，或在不支援 XDP 的環境下，可以直接啟動內建限速邏輯的模擬 DNS 伺服器 `limited_dns_server.js`（它在 Node.js 中以與 BPF 程式完全相同的邏輯與演算法執行限速）：
+
+#### 步驟 1：啟動模擬限速 DNS 伺服器
+```bash
+node limited_dns_server.js
+```
+
+#### 步驟 2：執行測試
+同樣可以使用 `dns_test_client.js` 或 `dig` 來驗證限速功能：
+```bash
+# 使用 Node.js 測試客戶端
+node dns_test_client.js 127.0.0.1 www.google.com
+
+# 或者使用 dig 指令
+dig @127.0.0.1 -p 5333 www.google.com
+```
+
 > [!NOTE]
 > **時間段免限制規則**
-> 根據 eBPF 程式邏輯，若當前 UTC 時間在 `00:00` 至 `05:59` 之間（即 `current_hour < 6`），系統將不會進行任何丟包限制，所有查詢皆會放行。
+> 根據 eBPF 程式與 Node.js 模擬邏輯，若當前 UTC 時間在 `00:00` 至 `05:59` 之間（即 `current_hour < 6`），系統將不會進行任何限速與丟包，所有查詢皆會直接放行。
 
 ---
 

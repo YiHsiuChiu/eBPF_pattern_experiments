@@ -10,14 +10,10 @@ char LICENSE[] SEC("license") = "GPL";
 SEC("xdp")
 int xdp_prog(struct xdp_md *ctx)
 {
-    volatile const __u32 len = 1500;
     volatile __u32 sum = 0;
 
 #pragma clang loop unroll(disable)
     for (int i = 0; i < MAX_LOOP; i++) {
-
-        if (i >= len)
-            break;
 
         sum += i * (i + 1);
         asm volatile("" ::: "memory");

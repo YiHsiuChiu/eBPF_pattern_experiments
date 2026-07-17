@@ -8,10 +8,10 @@ end="${2:-10000}"
 step="${3:-1}"
 
 for n in $(seq "$start" "$step" "$end"); do
-    echo "=== MAX_LOOP=$n ==="
+    echo "=== K=$n ==="
 
     make clean >/dev/null 2>&1
-    if ! make xdp_operation_loop.bpf.o MAX_LOOP="$n" >/tmp/xdp_make.log 2>&1; then
+    if ! make xdp_operation_loop.bpf.o K="$n" >/tmp/xdp_make.log 2>&1; then
         echo "build failed"
         cat /tmp/xdp_make.log
         exit 1
@@ -23,7 +23,7 @@ for n in $(seq "$start" "$step" "$end"); do
     else
         echo "LOAD_FAIL"
         tail -n 20 /tmp/xdp_increasing_load.err
-        echo "Threshold found at MAX_LOOP=$n"
+        echo "Threshold found at K=$n"
         exit 0
     fi
 

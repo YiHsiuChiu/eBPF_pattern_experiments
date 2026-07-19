@@ -42,37 +42,31 @@ struct {
 
 static long map_initialize(__u32 i, void *ctx) {
     __u32 zero = 0;
+    
     struct payload *val = bpf_map_lookup_elem(&scratch_map, &zero);
     if (!val) 
         return 1;
 
-    __builtin_memset(val, (__u8)i, sizeof(*val));
-    __u32 key = i; 
-    bpf_map_update_elem(&target_map, &key, val, BPF_ANY);
+    #pragma unroll
+    for (int j = 0; j < PAYLOAD_SIZE; j++) {
+        val->data[j] = 42;
+    }
+
+    bpf_map_update_elem(&target_map, &i, val, BPF_ANY);
+
     return 0;
 }
 
 static long map_update(__u32 i, void *ctx) {
-    __u32 zero = 0;
-    struct payload *val = bpf_map_lookup_elem(&scratch_map, &zero);
+    
+    struct payload *val = bpf_map_lookup_elem(&target_map, &i);
     if (!val) 
         return 1;
 
-    __builtin_memset(val, (__u8)i, sizeof(*val));
-
-    __u32 random_val = bpf_get_prandom_u32();
-    __u32 key = random_val % MAX_ENTRIES; 
-
-    __u64 start = bpf_ktime_get_ns();
-    bpf_map_update_elem(&target_map, &key, val, BPF_ANY);
-    __u64 end = bpf_ktime_get_ns();
-
-    __u64 delta = end - start;
-    __u32 idx = 0;
-
-    __u64 *total = bpf_map_lookup_elem(&latency_map, &idx);
-    if (total)
-        *total += delta;
+    #pragma unroll
+    for (int j = 0; j < PAYLOAD_SIZE; j++) {
+        val->data[j] = 42;
+    }
 
     return 0;
 }
@@ -80,9 +74,16 @@ static long map_update(__u32 i, void *ctx) {
 SEC("xdp")
 int xdp_map_update(struct xdp_md *ctx)
 {
+    __u32 zero = 0;
+
     bpf_loop(MAX_ENTRIES, map_initialize, NULL, 0);
 
+    __u64 start = bpf_ktime_get_ns();
     bpf_loop(SAMPLES, map_update, NULL, 0);
+    __u64 end = bpf_ktime_get_ns();
     
+    __u64 total_latency = end - start;
+    bpf_map_update_elem(&latency_map, &zero, &total_latency, BPF_ANY);
+
     return XDP_DROP;
 }

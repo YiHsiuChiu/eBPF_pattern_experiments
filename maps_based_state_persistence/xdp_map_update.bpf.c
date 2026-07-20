@@ -13,7 +13,12 @@ char LICENSE[] SEC("license") = "GPL";
 #define PAYLOAD_SIZE 8
 #endif
 
+#define KEY_LOOKUP   0
+#define KEY_UPDATE   1
+#define KEY_SPINLOCK 2
+
 struct payload {
+    struct bpf_spin_lock lock;
     __u8 data[PAYLOAD_SIZE];
 };
 
@@ -24,35 +29,36 @@ struct {
     __type(value, struct payload);
 } target_map SEC(".maps");
 
-/* Scratch buffer */
-struct {
-    __uint(type, BPF_MAP_TYPE_ARRAY);
-    __uint(max_entries, 1);
-    __type(key, __u32);
-    __type(value, struct payload);
-} scratch_map SEC(".maps");
-
 /* 延遲記錄 Map */
 struct {
     __uint(type, BPF_MAP_TYPE_ARRAY);
-    __uint(max_entries, 1);
+    __uint(max_entries, 3);
     __type(key, __u32);
     __type(value, __u64);
 } latency_map SEC(".maps");
 
 static long map_initialize(__u32 i, void *ctx) {
-    __u32 zero = 0;
     
-    struct payload *val = bpf_map_lookup_elem(&scratch_map, &zero);
-    if (!val) 
-        return 1;
+    struct payload *val = bpf_map_lookup_elem(&target_map, &i);
+        if (!val) 
+            return 1;
+
+    bpf_spin_lock(&val->lock);
 
     #pragma unroll
     for (int j = 0; j < PAYLOAD_SIZE; j++) {
         val->data[j] = 42;
     }
 
-    bpf_map_update_elem(&target_map, &i, val, BPF_ANY);
+    bpf_spin_unlock(&val->lock);
+
+    return 0;
+}
+
+static long map_lookup(__u32 i, void *ctx) {
+    __u64 *res;
+
+    res = bpf_map_lookup_elem(&target_map, &i);
 
     return 0;
 }
@@ -71,19 +77,62 @@ static long map_update(__u32 i, void *ctx) {
     return 0;
 }
 
+static long map_spinlock_update(__u32 i, void *ctx) {
+    
+    struct payload *val = bpf_map_lookup_elem(&target_map, &i);
+    if (!val)
+        return 1;
+
+    bpf_spin_lock(&val->lock);
+
+    #pragma unroll
+    for (int j = 0; j < PAYLOAD_SIZE; j++) {
+        val->data[j] = 42;
+    }
+
+    bpf_spin_unlock(&val->lock);
+
+    return 0;
+}
+
 SEC("xdp")
 int xdp_map_update(struct xdp_md *ctx)
 {
-    __u32 zero = 0;
+    __u32 key;
+    __u64 latency;
 
+    //lookup
     bpf_loop(MAX_ENTRIES, map_initialize, NULL, 0);
 
-    __u64 start = bpf_ktime_get_ns();
-    bpf_loop(SAMPLES, map_update, NULL, 0);
-    __u64 end = bpf_ktime_get_ns();
+    __u64 lookup_start = bpf_ktime_get_ns();
+    bpf_loop(MAX_ENTRIES, map_lookup, NULL, 0);
+    __u64 lookup_end = bpf_ktime_get_ns();
+
+    latency = lookup_end - lookup_start;
+    key = KEY_LOOKUP;
+    bpf_map_update_elem(&latency_map, &key, &latency, BPF_ANY);
+
+    //update
+    bpf_loop(MAX_ENTRIES, map_initialize, NULL, 0);
+
+    __u64 update_start = bpf_ktime_get_ns();
+    bpf_loop(MAX_ENTRIES, map_update, NULL, 0);
+    __u64 update_end = bpf_ktime_get_ns();
+
+    latency = update_end - update_start;
+    key = KEY_UPDATE;
+    bpf_map_update_elem(&latency_map, &key, &latency, BPF_ANY);
+
+    //spinlock update
+    bpf_loop(MAX_ENTRIES, map_initialize, NULL, 0);
+
+    __u64 spinlock_start = bpf_ktime_get_ns();
+    bpf_loop(MAX_ENTRIES, map_spinlock_update, NULL, 0);
+    __u64 spinlock_end = bpf_ktime_get_ns();
     
-    __u64 total_latency = end - start;
-    bpf_map_update_elem(&latency_map, &zero, &total_latency, BPF_ANY);
+    latency = spinlock_end - spinlock_start;
+    key = KEY_SPINLOCK;
+    bpf_map_update_elem(&latency_map, &key, &latency, BPF_ANY);
 
     return XDP_DROP;
 }

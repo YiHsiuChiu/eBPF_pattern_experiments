@@ -19,10 +19,12 @@ all: xdp_map_update.bpf.o map_update
 xdp_map_update.bpf.o: xdp_map_update.bpf.c
 	$(CLANG) $(BPF_CFLAGS) -c $< -o $@
 
-map_update: map_update.c
-	$(CC) $(CFLAGS) -DSAMPLES=$(SAMPLES) -I. -o $@ $< -lbpf
+map_update: FORCE map_update.c
+	$(CC) $(CFLAGS) -DSAMPLES=$(SAMPLES) -I. -o $@ map_update.c -lbpf
 
 clean:
 	rm -f xdp_map_update.bpf.o map_update
 
-.PHONY: all clean
+.PHONY: all clean FORCE
+
+FORCE:

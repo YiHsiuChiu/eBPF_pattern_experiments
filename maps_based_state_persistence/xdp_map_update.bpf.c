@@ -37,6 +37,14 @@ struct {
     __type(value, __u64);
 } latency_map SEC(".maps");
 
+static __always_inline void accumulate_latency(__u32 key, __u64 latency)
+{
+    __u64 *total = bpf_map_lookup_elem(&latency_map, &key);
+
+    if (total)
+        __sync_fetch_and_add(total, latency);
+}
+
 static long map_initialize(__u32 i, void *ctx) {
     
     struct payload *val = bpf_map_lookup_elem(&target_map, &i);
@@ -110,7 +118,7 @@ int xdp_map_update(struct xdp_md *ctx)
 
     latency = lookup_end - lookup_start;
     key = KEY_LOOKUP;
-    bpf_map_update_elem(&latency_map, &key, &latency, BPF_ANY);
+    accumulate_latency(key, latency);
 
     //update
     bpf_loop(MAX_ENTRIES, map_initialize, NULL, 0);
@@ -121,7 +129,7 @@ int xdp_map_update(struct xdp_md *ctx)
 
     latency = update_end - update_start;
     key = KEY_UPDATE;
-    bpf_map_update_elem(&latency_map, &key, &latency, BPF_ANY);
+    accumulate_latency(key, latency);
 
     //spinlock update
     bpf_loop(MAX_ENTRIES, map_initialize, NULL, 0);
@@ -132,7 +140,7 @@ int xdp_map_update(struct xdp_md *ctx)
     
     latency = spinlock_end - spinlock_start;
     key = KEY_SPINLOCK;
-    bpf_map_update_elem(&latency_map, &key, &latency, BPF_ANY);
+    accumulate_latency(key, latency);
 
     return XDP_DROP;
 }

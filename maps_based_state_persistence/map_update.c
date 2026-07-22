@@ -105,7 +105,7 @@ int main(int argc, char **argv)
         .data_size_in = sizeof(pkt_in),
         .data_out = pkt_out,
         .data_size_out = sizeof(pkt_out),
-        .repeat = 1
+        .repeat = SAMPLES
     );
 
     int err = bpf_prog_test_run_opts(prog_fd, &opts);
@@ -128,7 +128,7 @@ int main(int argc, char **argv)
 
     printf("RESULTS payload=%d bytes\n", value_size);
     for (int i = 0; i < 3; i++) {
-        double avg_latency = (double)total_latency[i] / SAMPLES;
+        double avg_latency = (double)total_latency[i] / (SAMPLES * MAX_ENTRIES);
         printf("  %-16s: %.2f ns\n", latency_names[i], avg_latency);
     }
 

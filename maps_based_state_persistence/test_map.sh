@@ -6,7 +6,7 @@ set -e
 SIZES=(8 16 32 64 128 256 512 1024)
 RESULTS=()
 
-SAMPLES=10000
+SAMPLES=2000
 
 echo "=== 開始進行 BPF Map Update 效能測試 ==="
 

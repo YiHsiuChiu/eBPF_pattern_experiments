@@ -126,7 +126,7 @@ int main(int argc, char **argv)
         }
     }
 
-\    printf("RESULTS payload=%d bytes\n", value_size);
+    printf("RESULTS payload=%d bytes\n", value_size);
     for (int i = 0; i < 3; i++) {
         double avg_latency = (double)total_latency[i] / SAMPLES;
         printf("  %-16s: %.2f ns\n", latency_names[i], avg_latency);

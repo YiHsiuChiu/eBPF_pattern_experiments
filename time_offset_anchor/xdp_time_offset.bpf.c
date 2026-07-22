@@ -121,6 +121,8 @@ int xdp_time_offset(struct xdp_md *ctx)
     // datetime
     struct datetime dt = {};
     start = bpf_ktime_get_ns();
+    if (boot_time_epoch)
+        real_epoch_sec = *boot_time_epoch + now_sec;
     epoch_to_datetime(real_epoch_sec, &dt);
     end = bpf_ktime_get_ns();
     record_latency(KEY_DATETIME, end - start);

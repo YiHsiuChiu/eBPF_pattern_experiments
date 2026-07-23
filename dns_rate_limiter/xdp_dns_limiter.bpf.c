@@ -8,6 +8,11 @@
 
 char LICENSE[] SEC("license") = "GPL";
 
+/* 可在檔頭或 Makefile 透過 -DMAX_QPS=xxxx 設定上限，預設為每秒 10,000 筆 */
+#ifndef MAX_QPS
+#define MAX_QPS 10000
+#endif
+
 /* DNS Header 結構 */
 struct dns_hdr {
     __be16 id;
@@ -26,14 +31,20 @@ struct query_key {
     __u32 qname_hash;  /* DNS QNAME 的雜湊值 */
 };
 
-/* 紀錄 client IP + Domain 上次查詢時間的 HASH Map
+/* Rate limiter Map 的 Value (紀錄秒數與當秒累積計數) */
+struct limit_val {
+    __u64 last_time;   /* 上次紀錄的 timestamp (單位: 秒) */
+    __u32 count;       /* 在當前這一秒內已累積的查詢次數 */
+};
+
+/* 紀錄 client IP + Domain 上次查詢時間與計數的 HASH Map
  * 限制最大容量 10240 筆
  */
 struct {
     __uint(type, BPF_MAP_TYPE_HASH);
     __uint(max_entries, 10240);
     __type(key, struct query_key);
-    __type(value, __u64); /* 上次查詢的 ktime (單位: 秒) */
+    __type(value, struct limit_val);
 } dns_limit_map SEC(".maps");
 
 struct {
@@ -149,26 +160,43 @@ int xdp_dns_limit(struct xdp_md *ctx) {
         };
 
         __u64 now = bpf_ktime_get_ns() / 1000000000;
-        __u64 *last_time = bpf_map_lookup_elem(&dns_limit_map, &key);
+        struct limit_val *val = bpf_map_lookup_elem(&dns_limit_map, &key);
 
-        if (last_time) {
-            if (now - *last_time < 1) {
-                // 檢查時間
-                __u32 key = 0;
-                __u64 *boot_time = bpf_map_lookup_elem(&boot_time_map, &key);
-                __u64 current_hour = ((now + *boot_time) % 86400) / 3600;
-                bpf_printk("Current Hour: %d", current_hour);
-                // 0-5點沒有限制
-                if(current_hour >= 6)
-                    return XDP_DROP;
+        if (val) {
+            if (val->last_time == now) {
+                // 1. 還在同這一秒內
+                if (val->count >= MAX_QPS) {
+                    // 超過 MAX_QPS，檢查時間豁免條款
+                    __u32 b_key = 0;
+                    __u64 *boot_time = bpf_map_lookup_elem(&boot_time_map, &b_key);
+                    if (boot_time) {
+                        __u64 current_hour = ((now + *boot_time) % 86400) / 3600;
+                        bpf_printk("Current Hour: %d", current_hour);
+                        // 0-5點沒有限制
+                        if (current_hour >= 6)
+                            return XDP_DROP;
+                    } else {
+                        return XDP_DROP;
+                    }
+                } else {
+                    // 未超過上限，計數器 +1
+                    val->count++;
+                }
+            } else {
+                // 2. 進入新的一秒，重置時間與計數器
+                val->last_time = now;
+                val->count = 1;
             }
-            // 更新上次查詢時間
-            *last_time = now;
         } else {
-            // 第一次查詢，記錄目前時間
-            bpf_map_update_elem(&dns_limit_map, &key, &now, BPF_ANY);
+            // 3. 第一次查詢，記錄目前時間與初始計數 1
+            struct limit_val new_val = {
+                .last_time = now,
+                .count = 1
+            };
+            bpf_map_update_elem(&dns_limit_map, &key, &new_val, BPF_ANY);
         }
     }
 
     return XDP_PASS;
 }
+

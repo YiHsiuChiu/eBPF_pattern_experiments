@@ -1,9 +1,11 @@
 const dns = require('dns2');
 const { Packet } = dns;
 
-// Map to store the last query timestamp for each client IP + domain name hash
+const MAX_QPS = 10000;
+
+// Map to store rate limit state for each client IP + domain name hash
 // Key: "client_ip:qname_hash"
-// Value: timestamp in milliseconds
+// Value: { lastSec: number, count: number }
 const limitMap = new Map();
 
 /**
@@ -40,8 +42,9 @@ function getQNameHash(domain) {
 
 const server = dns.createUDPServer((request, send, rinfo) => {
   const response = Packet.createResponseFromRequest(request);
-  const now = Date.now();
-  const currentHour = new Date(now).getUTCHours();
+  const nowMs = Date.now();
+  const currentSec = Math.floor(nowMs / 1000);
+  const currentHour = new Date(nowMs).getUTCHours();
 
   let shouldDrop = false;
 
@@ -51,20 +54,30 @@ const server = dns.createUDPServer((request, send, rinfo) => {
     const qnameHash = getQNameHash(name);
 
     const key = `${rinfo.address}:${qnameHash}`;
-    const lastTime = limitMap.get(key);
+    const record = limitMap.get(key);
 
-    if (lastTime !== undefined) {
-      // If elapsed time is less than 1 second (1000 milliseconds)
-      if (now - lastTime < 1000) {
-        // Rule: No limits between 00:00 and 05:59 UTC (hour < 6)
-        if (currentHour >= 6) {
-          shouldDrop = true;
-          console.log(`[Rate Limiter] DROP: Client ${rinfo.address} queried "${name}" (Hash: ${qnameHash}) too quickly. Current UTC Hour: ${currentHour}`);
-          break;
+    if (record !== undefined) {
+      if (record.lastSec === currentSec) {
+        // 同在一秒內
+        if (record.count >= MAX_QPS) {
+          // Rule: No limits between 00:00 and 05:59 UTC (hour < 6)
+          if (currentHour >= 6) {
+            shouldDrop = true;
+            console.log(`[Rate Limiter] DROP: Client ${rinfo.address} queried "${name}" (Count ${record.count} >= ${MAX_QPS}). Current UTC Hour: ${currentHour}`);
+            break;
+          }
+        } else {
+          record.count++;
         }
+      } else {
+        // 進入新的一秒，重置計數
+        record.lastSec = currentSec;
+        record.count = 1;
       }
+    } else {
+      // 首次查詢，初始化
+      limitMap.set(key, { lastSec: currentSec, count: 1 });
     }
-    limitMap.set(key, now);
   }
 
   if (shouldDrop) {

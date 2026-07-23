@@ -16,7 +16,7 @@ const server = dns.createUDPServer((request, send, rinfo) => {
 });
 
 server.on('request', (request, response, rinfo) => {
-  console.log(request.header.id, request.questions[0]);
+  // console.log(request.header.id, request.questions[0]);
 });
 
 server.listen(5333);

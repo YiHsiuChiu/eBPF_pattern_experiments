@@ -1,7 +1,7 @@
 const dns = require('dns2');
 const { Packet } = dns;
 
-const MAX_QPS = 10000;
+const MAX_QPS = 1000;
 
 // Map to store rate limit state for each client IP + domain name hash
 // Key: "client_ip:qname_hash"
@@ -54,16 +54,19 @@ const server = dns.createUDPServer((request, send, rinfo) => {
     const qnameHash = getQNameHash(name);
 
     const key = `${rinfo.address}:${qnameHash}`;
+    // console.log("key:", key);
     const record = limitMap.get(key);
 
     if (record !== undefined) {
       if (record.lastSec === currentSec) {
         // 同在一秒內
+        // console.log("record count:", record.count);
         if (record.count >= MAX_QPS) {
           // Rule: No limits between 00:00 and 05:59 UTC (hour < 6)
-          if (currentHour >= 6) {
+          // console.log(currentHour);
+          if (currentHour >= 1) {
             shouldDrop = true;
-            console.log(`[Rate Limiter] DROP: Client ${rinfo.address} queried "${name}" (Count ${record.count} >= ${MAX_QPS}). Current UTC Hour: ${currentHour}`);
+            // console.log(`[Rate Limiter] DROP: Client ${rinfo.address} queried "${name}" (Count ${record.count} >= ${MAX_QPS}). Current UTC Hour: ${currentHour}`);
             break;
           }
         } else {
@@ -100,7 +103,7 @@ const server = dns.createUDPServer((request, send, rinfo) => {
 });
 
 server.on('request', (request, response, rinfo) => {
-  console.log(`[Request] ID: ${request.header.id}, Question:`, request.questions[0] ? request.questions[0].name : 'None');
+  // console.log(`[Request] ID: ${request.header.id}, Question:`, request.questions[0] ? request.questions[0].name : 'None');
 });
 
 server.listen(5333);

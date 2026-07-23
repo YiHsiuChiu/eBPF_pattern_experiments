@@ -10,7 +10,7 @@ char LICENSE[] SEC("license") = "GPL";
 
 /* 可在檔頭或 Makefile 透過 -DMAX_QPS=xxxx 設定上限，預設為每秒 10,000 筆 */
 #ifndef MAX_QPS
-#define MAX_QPS 10000
+#define MAX_QPS 1000
 #endif
 
 /* DNS Header 結構 */
@@ -173,7 +173,7 @@ int xdp_dns_limit(struct xdp_md *ctx) {
                         __u64 current_hour = ((now + *boot_time) % 86400) / 3600;
                         bpf_printk("Current Hour: %d", current_hour);
                         // 0-5點沒有限制
-                        if (current_hour >= 6)
+                        if (current_hour >= 1)
                             return XDP_DROP;
                     } else {
                         return XDP_DROP;

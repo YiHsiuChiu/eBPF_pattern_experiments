@@ -16,7 +16,7 @@ int xdp_hash_bounded_loop(struct xdp_md *ctx)
     __u8 *ptr = (__u8 *)data;
 
     if ((void *)(ptr + K) > data_end) {
-        return XDP_PASS; // 或者 XDP_DROP，看你的業務邏輯
+        return XDP_PASS;
     }
     
     volatile __u32 hash = 5381;

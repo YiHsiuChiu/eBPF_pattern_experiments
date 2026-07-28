@@ -14,14 +14,9 @@ char LICENSE[] SEC("license") = "GPL";
 SEC("xdp")
 int xdp_unbounded_loop(struct xdp_md *ctx)
 {
-    void *data_end = (void *)(long)ctx->data_end;
     void *data = (void *)(long)ctx->data;
 
     __u8 *ptr = (__u8 *)data;
-
-    if ((void *)(ptr + K) > data_end) {
-        return XDP_PASS;
-    }
     
     volatile __u32 hash = 5381;
     volatile VARIABLE_TYPE len = 1000;

@@ -6,9 +6,9 @@ cd "$(dirname "$0")"
 # K 當邊界，K = end
 start="${1:-8000}"
 end="${2:-150000}"
-step="${3:-1000}"
+step="${3:-100}"
 # 指定實驗 TEST 模式（0 = sum, 1 = loadbyte, 2 = hash, 3 = 跑TYPE邊界）
-run_mode="${4:-2}"
+run_mode="${4:-1}"
 
 # 要測試的型態
 types=("__u16" "__u32" "__u64")

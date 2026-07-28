@@ -18,10 +18,6 @@ int xdp_loadbyte_bounded_loop(struct xdp_md *ctx)
         
         ret = bpf_xdp_load_bytes(ctx, i, &byte, 1);
         
-        if (ret < 0) {
-            break; 
-        }
-        
     }
 
     return XDP_PASS;

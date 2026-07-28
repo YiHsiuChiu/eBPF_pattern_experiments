@@ -4,7 +4,7 @@ CFLAGS ?= -O2 -g -Wall -target bpf
 # 預設常數 K
 K ?= 2000
 # 預設變數型態
-VARIABLE_TYPE ?= __u32
+VARIABLE_TYPE ?= __u16
 
 ARCH := $(shell uname -m | sed 's/x86_64/x86_64-linux-gnu/' | sed 's/aarch64/aarch64-linux-gnu/')
 INCLUDES ?= -I/usr/include -I/usr/include/bpf -I/usr/include/$(ARCH)

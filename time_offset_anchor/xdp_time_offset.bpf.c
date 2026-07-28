@@ -107,11 +107,10 @@ int xdp_time_offset(struct xdp_md *ctx)
     end = bpf_ktime_get_ns();
     record_latency(KEY_GET_KTIME, end - start);
 
-    __u64 now_sec = now_ns / 1000000000;
-
     // reconstruct
     __u64 real_epoch_sec = 0;
     start = bpf_ktime_get_ns();
+    __u64 now_sec = bpf_ktime_get_ns() / 1000000000;
     __u64 *boot_time_epoch = bpf_map_lookup_elem(&boot_time_map, &zero);
     if (boot_time_epoch)
         real_epoch_sec = *boot_time_epoch + now_sec;
@@ -121,6 +120,8 @@ int xdp_time_offset(struct xdp_md *ctx)
     // datetime
     struct datetime dt = {};
     start = bpf_ktime_get_ns();
+    now_sec = bpf_ktime_get_ns() / 1000000000;
+    *boot_time_epoch = bpf_map_lookup_elem(&boot_time_map, &zero);
     if (boot_time_epoch)
         real_epoch_sec = *boot_time_epoch + now_sec;
     epoch_to_datetime(real_epoch_sec, &dt);

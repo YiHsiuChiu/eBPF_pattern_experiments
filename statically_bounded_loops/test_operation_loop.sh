@@ -23,6 +23,10 @@ case "$run_mode" in
     5) bpf_obj="xdp_unbounded_loop_hash.bpf.o" ;;
     6) bpf_obj="xdp_unbounded_loop_loadbyte.bpf.o" ;;
     7) bpf_obj="xdp_unbounded_loop_parse.bpf.o" ;;
+    8) bpf_obj="xdp_bpf_loop.bpf.o" ;;
+    9) bpf_obj="xdp_bpf_loop_loadbyte.bpf.o" ;;
+    10) bpf_obj="xdp_bpf_loop_hash.bpf.o" ;;
+    11) bpf_obj="xdp_bpf_loop_parse.bpf.o" ;;
     *) echo "Error: Invalid run_mode $run_mode"; exit 1 ;;
 esac
 
@@ -63,7 +67,7 @@ fi
 # =====================================================================
 # 實驗二：run_mode 3 (由型態當變數邊界)
 # =====================================================================
-if [ "$run_mode" = "7" ] || [ "$run_mode" = "4" ] || [ "$run_mode" = "5" ] || [ "$run_mode" = "6" ]; then
+if [ "$run_mode" = "4" ] || [ "$run_mode" = "5" ] || [ "$run_mode" = "6" ] || [ "$run_mode" = "7" ] || [ "$run_mode" = "8" ] || [ "$run_mode" = "9" ] || [ "$run_mode" = "10" ] || [ "$run_mode" = "11" ]; then
     echo ""
     echo "=================================================="
     echo " RUNNING EXPERIMENT: Data-Dependent Loop ($bpf_obj)"

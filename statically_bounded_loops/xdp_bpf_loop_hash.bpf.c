@@ -7,8 +7,12 @@ char LICENSE[] SEC("license") = "GPL";
 #define K 1500
 #endif
 
+#ifndef VARIABLE_TYPE
+#define VARIABLE_TYPE __u32
+#endif
+
 SEC("xdp")
-int xdp_parse_bounded_loop(struct xdp_md *ctx)
+int xdp_bpf_loop(struct xdp_md *ctx)
 {
     void *data_end = (void *)(long)ctx->data_end;
     void *data = (void *)(long)ctx->data;
@@ -19,15 +23,14 @@ int xdp_parse_bounded_loop(struct xdp_md *ctx)
         return XDP_PASS;
     }
 
-    #pragma clang loop unroll(disable)
-    for (int i = 0; i < K; i++) {
-        if (ptr + 1 > (__u8 *)data_end)
-        break;
+    volatile __u32 hash = 5381;
+    volatile VARIABLE_TYPE len = 1000;
+    int i;
+    bpf_for (i, 0, len) {
 
-        (void)*(volatile __u8 *)ptr;
-        ptr += 1;
-
-        asm volatile("" ::: "memory");
+        __u8 val = *ptr;
+        hash = ((hash << 5) + hash) + val;
+        
     }
 
     return XDP_PASS;

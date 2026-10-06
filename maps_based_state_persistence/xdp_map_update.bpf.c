@@ -64,9 +64,20 @@ static long map_initialize(__u32 i, void *ctx) {
 }
 
 static long map_lookup(__u32 i, void *ctx) {
-    __u64 *res;
+    volatile struct payload *val;
 
-    res = bpf_map_lookup_elem(&target_map, &i);
+    val = bpf_map_lookup_elem(&target_map, &i);
+
+    /* change lookup to read */
+    // if (!val) 
+    //     return 1;
+
+    // #pragma unroll
+    // for (int j = 0; j < PAYLOAD_SIZE; j++) {
+    //     /* Volatile global_data forces an actual load for every byte. */
+    //     (void)val->data[j];
+    // }
+    /* --------------------- */
 
     return 0;
 }

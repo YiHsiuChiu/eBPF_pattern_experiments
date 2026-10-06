@@ -18,17 +18,18 @@ case "$run_mode" in
     0) bpf_obj="xdp_sum_loop.bpf.o" ;;
     1) bpf_obj="xdp_loadbyte_loop.bpf.o" ;;
     2) bpf_obj="xdp_hash_loop.bpf.o" ;;
-    3) bpf_obj="xdp_unbounded_loop.bpf.o" ;;
-    4) bpf_obj="xdp_unbounded_loop_hash.bpf.o" ;;
-    5) bpf_obj="xdp_unbounded_loop_loadbyte.bpf.o" ;;
-    6) bpf_obj="xdp_unbounded_loop_parse.bpf.o" ;;
+    3) bpf_obj="xdp_parse_loop.bpf.o" ;;
+    4) bpf_obj="xdp_unbounded_loop.bpf.o" ;;
+    5) bpf_obj="xdp_unbounded_loop_hash.bpf.o" ;;
+    6) bpf_obj="xdp_unbounded_loop_loadbyte.bpf.o" ;;
+    7) bpf_obj="xdp_unbounded_loop_parse.bpf.o" ;;
     *) echo "Error: Invalid run_mode $run_mode"; exit 1 ;;
 esac
 
 # =====================================================================
 # 實驗一：run_mode 0, 1, 2 (測試 Bounded Loop，找常數 K 的極限)
 # =====================================================================
-if [ "$run_mode" = "0" ] || [ "$run_mode" = "1" ] || [ "$run_mode" = "2" ]; then
+if [ "$run_mode" = "0" ] || [ "$run_mode" = "1" ] || [ "$run_mode" = "2" ] || [ "$run_mode" = "3" ]; then
     echo "=================================================="
     echo " RUNNING EXPERIMENT: Bounded Loop by K ($bpf_obj)"
     echo "=================================================="
@@ -62,7 +63,7 @@ fi
 # =====================================================================
 # 實驗二：run_mode 3 (由型態當變數邊界)
 # =====================================================================
-if [ "$run_mode" = "3" ] || [ "$run_mode" = "4" ] || [ "$run_mode" = "5" ] || [ "$run_mode" = "6" ]; then
+if [ "$run_mode" = "7" ] || [ "$run_mode" = "4" ] || [ "$run_mode" = "5" ] || [ "$run_mode" = "6" ]; then
     echo ""
     echo "=================================================="
     echo " RUNNING EXPERIMENT: Data-Dependent Loop ($bpf_obj)"

@@ -111,12 +111,11 @@ int xdp_time_offset(struct xdp_md *ctx)
     record_latency(KEY_GET_KTIME, end - start);
 
     // reconstruct
-    __u64 real_epoch_sec2 = 0;
     start = bpf_ktime_get_ns();
     __u64 now_sec2 = bpf_ktime_get_tai_ns() / 1000000000;
     __u64 *boot_time_epoch = bpf_map_lookup_elem(&boot_time_map, &zero);
     if (boot_time_epoch)
-        real_epoch_sec2 = *boot_time_epoch + now_sec2;
+        real_epoch_sec = *boot_time_epoch + now_sec2;
     end = bpf_ktime_get_ns();
     record_latency(KEY_RECONSTRUCT, end - start);
 

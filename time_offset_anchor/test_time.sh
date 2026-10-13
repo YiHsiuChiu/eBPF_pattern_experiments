@@ -18,6 +18,11 @@ if ! [[ "$SAMPLES" =~ ^[1-9][0-9]*$ ]]; then
     exit 1
 fi
 
+echo "[*] 清除舊的 BPF map pins..."
+rm -f /sys/fs/bpf/boot_time_map
+rm -f /sys/fs/bpf/latency_map
+
 make
 
 "$USER_PROG" -n "$SAMPLES"
+

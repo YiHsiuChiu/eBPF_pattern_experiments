@@ -17,12 +17,15 @@
 #define SAMPLES 2000
 #endif
 
-#define KEY_LOOKUP   0
-#define KEY_UPDATE   1
-#define KEY_SPINLOCK 2
+#define KEY_LOOKUP          0
+#define KEY_READ            1
+#define KEY_UPDATE          2
+#define KEY_SPINLOCK_UPDATE 3
+#define TEST_COUNT          4
 
 static const char *latency_names[] = {
     "lookup",
+    "map_read",
     "update",
     "spinlock_update"
 };
@@ -73,8 +76,8 @@ int main(int argc, char **argv)
     int target_map_fd = bpf_map__fd(target_map);
 
     // Initialize target_map before benchmarking.
-    size_t payload_struct_size =
-        sizeof(__u32) + (size_t)value_size;
+    /* Use the kernel map value size (including any alignment padding). */
+    size_t payload_struct_size = bpf_map__value_size(target_map);
 
     void *dummy_payload =
         calloc(1, payload_struct_size);
@@ -140,7 +143,7 @@ int main(int argc, char **argv)
     }
 
     fprintf(csv,
-            "sample,lookup_ns,update_ns,"
+            "sample,lookup_ns,map_read_ns,update_ns,"
             "spinlock_update_ns\n");
 
     __u8 pkt_in[64] = {0};
@@ -156,19 +159,20 @@ int main(int argc, char **argv)
         .repeat = 1
     );
 
-    __u32 keys[3] = {
+    __u32 keys[TEST_COUNT] = {
         KEY_LOOKUP,
+        KEY_READ,
         KEY_UPDATE,
-        KEY_SPINLOCK
+        KEY_SPINLOCK_UPDATE
     };
 
-    __u64 previous[3] = {0};
-    __u64 current[3] = {0};
+    __u64 previous[TEST_COUNT] = {0};
+    __u64 current[TEST_COUNT] = {0};
 
-    double latency_sum[3] = {0};
+    double latency_sum[TEST_COUNT] = {0};
 
     // Read initial cumulative latency values.
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < TEST_COUNT; i++) {
         if (bpf_map_lookup_elem(
                 latency_map_fd,
                 &keys[i],
@@ -199,7 +203,7 @@ int main(int argc, char **argv)
         }
 
         // Read cumulative values after this sample.
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < TEST_COUNT; i++) {
             if (bpf_map_lookup_elem(
                     latency_map_fd,
                     &keys[i],
@@ -213,9 +217,9 @@ int main(int argc, char **argv)
             }
         }
 
-        double latency_ns[3];
+        double latency_ns[TEST_COUNT];
 
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < TEST_COUNT; i++) {
 
             // Extract this sample's latency.
             __u64 sample_total =
@@ -232,11 +236,12 @@ int main(int argc, char **argv)
         }
 
         // Write sample to CSV.
-        fprintf(csv, "%d,%.4f,%.4f,%.4f\n",
+        fprintf(csv, "%d,%.4f,%.4f,%.4f,%.4f\n",
                 sample + 1,
                 latency_ns[KEY_LOOKUP],
+                latency_ns[KEY_READ],
                 latency_ns[KEY_UPDATE],
-                latency_ns[KEY_SPINLOCK]);
+                latency_ns[KEY_SPINLOCK_UPDATE]);
     }
 
     if (fclose(csv) != 0) {
@@ -250,7 +255,7 @@ int main(int argc, char **argv)
     printf("RESULTS payload=%d bytes\n",
            value_size);
 
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < TEST_COUNT; i++) {
         double avg_latency =
             latency_sum[i] / SAMPLES;
 

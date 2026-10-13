@@ -1,44 +1,40 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-set -e
+cd "$(dirname "$0")"
 
-# payload 大小
 SIZES=(8 16 32 64 128 256 512 1024)
+SAMPLES=${SAMPLES:-2000}
 RESULTS=()
 
-SAMPLES=2000
-
-echo "=== 開始進行 BPF Map Update 效能測試 ==="
-
+printf '=== 開始進行 BPF Map 效能測試 (SAMPLES=%s) ===\n' "$SAMPLES"
 make map_update SAMPLES="$SAMPLES"
 
 for n in "${SIZES[@]}"; do
-    echo "[*] 正在測試 payload size: ${n} bytes..."
-    
-    rm -f xdp_map_update.bpf.o
-    
-    make xdp_map_update.bpf.o PAYLOAD_SIZE="$n" SAMPLES="$SAMPLES"
-    
+    printf '[*] 正在測試 payload size: %s bytes...\n' "$n"
+    # Force rebuilding the BPF object for the new compile-time payload size.
+    make -B xdp_map_update.bpf.o PAYLOAD_SIZE="$n" SAMPLES="$SAMPLES"
     OUTPUT=$(sudo ./map_update "$n")
-    
-    LOOKUP=$(echo "$OUTPUT" | awk '/lookup/ {print $3}')
-    UPDATE=$(echo "$OUTPUT" | awk '/update/ && !/spinlock/ {print $3}')
-    SPINLOCK=$(echo "$OUTPUT" | awk '/spinlock_update/ {print $3}')
-    
-    RESULTS+=("${n}:${LOOKUP}:${UPDATE}:${SPINLOCK}")
+    printf '%s\n' "$OUTPUT"
+
+    # Match the full metric name, not the substring "update".
+    LOOKUP=$(awk '$1 == "lookup" && $2 == ":" {print $3}' <<< "$OUTPUT")
+    READ=$(awk '$1 == "map_read" && $2 == ":" {print $3}' <<< "$OUTPUT")
+    UPDATE=$(awk '$1 == "update" && $2 == ":" {print $3}' <<< "$OUTPUT")
+    SPINLOCK=$(awk '$1 == "spinlock_update" && $2 == ":" {print $3}' <<< "$OUTPUT")
+
+    if [[ -z "$LOOKUP" || -z "$READ" || -z "$UPDATE" || -z "$SPINLOCK" ]]; then
+        printf 'ERROR: Missing latency value for payload=%s\n' "$n" >&2
+        exit 1
+    fi
+    RESULTS+=("${n}:${LOOKUP}:${READ}:${UPDATE}:${SPINLOCK}")
 done
 
-echo -e "\n========================================================================="
-echo -e "                       BPF Map 效能測試結果"
-echo -e "========================================================================="
-printf "%-20s | %-15s | %-15s | %-15s\n" "Payload Size (Bytes)" "Lookup (ns)" "Update (ns)" "Spinlock (ns)"
-echo -e "-------------------------------------------------------------------------"
-
+printf '\n%-20s | %-15s | %-15s | %-15s | %-15s\n' \
+    'Payload Size (Bytes)' 'Lookup (ns)' 'Map Read (ns)' 'Update (ns)' 'Spinlock (ns)'
+printf '%s\n' '----------------------------------------------------------------------------------------------------'
 for res in "${RESULTS[@]}"; do
-    IFS=":" read -r size lookup update spinlock <<< "$res"
-    printf "%-20s | %-15s | %-15s | %-15s\n" "  $size B" "$lookup ns" "$update ns" "$spinlock ns"
+    IFS=: read -r size lookup read update spinlock <<< "$res"
+    printf '%-20s | %-15s | %-15s | %-15s | %-15s\n' \
+        "$size B" "$lookup" "$read" "$update" "$spinlock"
 done
-
-echo -e "=========================================================================\n"
-
-rm -f xdp_map_update.bpf.o map_update

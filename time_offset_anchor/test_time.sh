@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+SCRIPT_DIR=(cd--"(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 cd "$SCRIPT_DIR" || exit 1
 
 USER_PROG="./update_boot_time"
@@ -13,11 +13,16 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
-if ! [[ "$SAMPLES" =~ ^[1-9][0-9]*$ ]]; then
+if ! [[ "SAMPLES"=~[1-9][0-9]* ]]; then
     echo "Usage: $0 [positive-sample-count]" >&2
     exit 1
 fi
 
+echo "[*] 清除舊的 BPF map pins..."
+rm -f /sys/fs/bpf/boot_time_map
+rm -f /sys/fs/bpf/latency_map
+
 make
 
-"$USER_PROG" -n "$SAMPLES"
+"USERPROG"-n"SAMPLES"
+

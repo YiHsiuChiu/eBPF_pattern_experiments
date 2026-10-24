@@ -12,7 +12,7 @@
 
 #define OBJ_PATH       "xdp_time_offset.bpf.o"
 #define PROG_NAME      "xdp_time_offset"
-#define BOOT_TIME_MAP  "boot_time_map"
+#define TAI_OFFSET_MAP "tai_offset_map"
 #define LATENCY_MAP    "latency_map"
 #define DATETIME_MAP   "datetime_map"
 
@@ -38,25 +38,14 @@ struct datetime {
 
 static const char *stage_name[NUM_STAGES] = {
     "get tai",
-    "reconstruct (add constant offset)",
-    "reconstruct (lookup + add)",
+    "reconstruct (subtract constant offset)",
+    "reconstruct (lookup + subtract)",
     "epoch to datetime",
 };
 
-static uint64_t compute_boot_epoch_sec(void)
+static uint64_t get_tai_offset_sec(void)
 {
-    struct timespec realtime, boottime;
-
-    if (clock_gettime(CLOCK_REALTIME, &realtime) ||
-        clock_gettime(CLOCK_BOOTTIME, &boottime)) {
-        perror("clock_gettime");
-        return 0;
-    }
-
-    return ((uint64_t)realtime.tv_sec * 1000000000ULL
-            + realtime.tv_nsec
-            - ((uint64_t)boottime.tv_sec * 1000000000ULL
-            + boottime.tv_nsec)) / 1000000000ULL;
+    return 37;
 }
 
 static void usage(const char *prog)
@@ -114,9 +103,9 @@ int main(int argc, char **argv)
         goto cleanup;
     }
 
-    struct bpf_map *boot_map =
+    struct bpf_map *tai_offset_map =
         bpf_object__find_map_by_name(
-            obj, BOOT_TIME_MAP);
+            obj, TAI_OFFSET_MAP);
 
     struct bpf_map *latency_map =
         bpf_object__find_map_by_name(
@@ -130,7 +119,7 @@ int main(int argc, char **argv)
         bpf_object__find_program_by_name(
             obj, PROG_NAME);
 
-    if (!boot_map || !latency_map ||
+    if (!tai_offset_map || !latency_map ||
         !datetime_map || !prog) {
 
         fprintf(stderr,
@@ -138,22 +127,21 @@ int main(int argc, char **argv)
         goto cleanup;
     }
 
-    int boot_fd = bpf_map__fd(boot_map);
+    int tai_offset_fd = bpf_map__fd(tai_offset_map);
     int latency_fd = bpf_map__fd(latency_map);
     int datetime_fd = bpf_map__fd(datetime_map);
     int prog_fd = bpf_program__fd(prog);
 
     __u32 zero = 0;
-    __u64 boot_epoch_sec = compute_boot_epoch_sec();
+    __u64 tai_offset_sec = get_tai_offset_sec();
 
     struct stat_val empty = {};
 
-    if (!boot_epoch_sec ||
-        bpf_map_update_elem(
-            boot_fd, &zero, &boot_epoch_sec, BPF_ANY)) {
+    if (bpf_map_update_elem(
+            tai_offset_fd, &zero, &tai_offset_sec, BPF_ANY)) {
 
         fprintf(stderr,
-                "Failed to initialise boot_time_map: %s\n",
+                "Failed to initialise tai_offset_map: %s\n",
                 strerror(errno));
         goto cleanup;
     }

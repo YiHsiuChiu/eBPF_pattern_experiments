@@ -45,18 +45,18 @@ static const char *stage_name[NUM_STAGES] = {
 
 static uint64_t compute_boot_epoch_sec(void)
 {
-    struct timespec realtime, boottime;
+    struct timespec realtime, monotonic;
 
     if (clock_gettime(CLOCK_REALTIME, &realtime) ||
-        clock_gettime(CLOCK_BOOTTIME, &boottime)) {
+        clock_gettime(CLOCK_MONOTONIC, &monotonic)) {
         perror("clock_gettime");
         return 0;
     }
 
     return ((uint64_t)realtime.tv_sec * 1000000000ULL
             + realtime.tv_nsec
-            - ((uint64_t)boottime.tv_sec * 1000000000ULL
-            + boottime.tv_nsec)) / 1000000000ULL;
+            - ((uint64_t)monotonic.tv_sec * 1000000000ULL
+            + monotonic.tv_nsec)) / 1000000000ULL;
 }
 
 static void usage(const char *prog)
